@@ -1,0 +1,10 @@
+# Dataset
+dataset
+
+# Models
+*.pt
+*.onnx
+
+# Others
+.DS_Store
+*.sh
