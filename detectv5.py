@@ -6,7 +6,7 @@ import sys
 from playsound import playsound
 
 # --- CONFIGURATION ---
-MODEL_PATH = './runs/detect/drowsiness_yolov65/weights/best.onnx' 
+MODEL_PATH = './runs/detect/drowsiness_yolov5/weights/best.onnx' 
 SOURCE = 0
 ALARM_FILE = "alarm.wav" 
 CONF_THRESHOLD = 0.45
