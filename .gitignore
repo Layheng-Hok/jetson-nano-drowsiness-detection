@@ -8,3 +8,5 @@ dataset
 # Others
 .DS_Store
 *.sh
+*.whl
+
