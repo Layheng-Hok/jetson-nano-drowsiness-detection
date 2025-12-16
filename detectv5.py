@@ -7,7 +7,7 @@ import os
 
 # --- CONFIGURATION ---
 # Update this path to where your ONNX file actually resides
-MODEL_PATH = './runs/detect/drowsiness_yolov5/weights/best.onnx' 
+MODEL_PATH = './yolov5/runs/train/drowsiness_yolov5/weights/best.onnx' 
 SOURCE = 0 # Camera index
 ALARM_FILE = "alarm.wav" 
 CONF_THRESHOLD = 0.50
