@@ -1,56 +1,53 @@
+import torch
 import cv2
 import numpy as np
 import threading
 import time
 import sys
 import os
+import pathlib
 
 # --- CONFIGURATION ---
-# Update this path to where your ONNX file actually resides
-MODEL_PATH = './yolov5/runs/train/drowsiness_yolov5/weights/best.onnx' 
+YOLO_PATH = './yolov5'
+MODEL_PATH = './yolov5/runs/train/drowsiness_yolov5/weights/best.pt' 
 SOURCE = 0 # Camera index
 ALARM_FILE = "alarm.wav" 
 CONF_THRESHOLD = 0.50
-NMS_THRESHOLD = 0.45
-INPUT_SIZE = (640, 640)
-
-CLASS_NAMES = ['Alert', 'MicroSleep', 'Yawn']
 ALERT_CLASSES = [1, 2] # Classes that trigger alarm
+# 0=Alert, 1=MicroSleep, 2=Yawn
 
 last_alert_time = 0
 alert_cooldown = 3
 
+temp = pathlib.PosixPath
+pathlib.WindowsPath = pathlib.PosixPath
+
 def play_alarm_sound():
-    """Uses aplay (native Linux) for lower latency than playsound"""
     try:
-        # Check if file exists first
         if os.path.exists(ALARM_FILE):
             os.system(f"aplay -q {ALARM_FILE}")
-        else:
-            print(f"Alarm file not found: {ALARM_FILE}")
     except Exception as e:
         print(f"Error playing sound: {e}")
 
 def main():
     global last_alert_time
     
-    # --- Load Model ---
-    if not os.path.exists(MODEL_PATH):
-        print(f"Error: Model file not found at {MODEL_PATH}")
-        sys.exit(1)
-
+    # --- Load Model via PyTorch ---
     print(f"Loading model from {MODEL_PATH}...")
-    net = cv2.dnn.readNetFromONNX(MODEL_PATH)
-    
-    # Enable CUDA (Jetson Nano)
     try:
-        net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-        print("CUDA backend set successfully.")
+        # Load custom model locally
+        model = torch.hub.load(YOLO_PATH, 'custom', path=MODEL_PATH, source='local')
+        model.conf = CONF_THRESHOLD
+        
+        # Check if CUDA is available for PyTorch
+        if torch.cuda.is_available():
+            print("Using CUDA (GPU) for inference")
+            model.cuda()
+        else:
+            print("WARNING: Using CPU (Slow)")
     except Exception as e:
-        print("WARNING: CUDA not available. Falling back to CPU (Slow).")
-        net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        print(f"Error loading model: {e}")
+        sys.exit(1)
 
     cap = cv2.VideoCapture(SOURCE)
     if not cap.isOpened():
@@ -64,96 +61,42 @@ def main():
         if not ret:
             break
 
-        img_h, img_w = frame.shape[:2]
-
-        # --- Preprocessing ---
-        # YOLOv5 input: 1x3x640x640, normalized 0-1
-        blob = cv2.dnn.blobFromImage(frame, 1/255.0, INPUT_SIZE, swapRB=True, crop=False)
-        net.setInput(blob)
-        
         # --- Inference ---
         start_time = time.time()
-        outputs = net.forward()
-        # outputs shape: (1, 25200, 5 + Num_Classes)
         
-        # --- Post-processing (Vectorized) ---
-        predictions = outputs[0]
+        # PyTorch handles the preprocessing/resizing internally
+        results = model(frame)
         
-        # 1. Filter by Confidence (Objectness)
-        # Keep only rows where objectness (index 4) > CONF_THRESHOLD
-        valid_indices = predictions[:, 4] > CONF_THRESHOLD
-        valid_predictions = predictions[valid_indices]
-        
-        boxes = []
-        confidences = []
-        class_ids = []
-
-        if len(valid_predictions) > 0:
-            # 2. Extract Class Scores and IDs
-            # valid_predictions shape: (N, 8) -> 5 box params + 3 classes
-            class_scores = valid_predictions[:, 5:]
-            class_ids_arr = np.argmax(class_scores, axis=1)
-            max_scores = np.max(class_scores, axis=1)
-            
-            # 3. Calculate Final Confidence
-            final_scores = valid_predictions[:, 4] * max_scores
-            
-            # 4. Filter by Final Confidence
-            final_indices = final_scores > CONF_THRESHOLD
-            
-            # Apply final filter
-            valid_predictions = valid_predictions[final_indices]
-            class_ids_arr = class_ids_arr[final_indices]
-            final_scores = final_scores[final_indices]
-            
-            if len(valid_predictions) > 0:
-                # 5. Convert Boxes (Center X, Center Y, W, H) -> (Left, Top, W, H)
-                # Scale factors
-                x_factor = img_w / INPUT_SIZE[0]
-                y_factor = img_h / INPUT_SIZE[1]
-                
-                cx = valid_predictions[:, 0]
-                cy = valid_predictions[:, 1]
-                w = valid_predictions[:, 2]
-                h = valid_predictions[:, 3]
-                
-                left = ((cx - w / 2) * x_factor).astype(int)
-                top = ((cy - h / 2) * y_factor).astype(int)
-                width = (w * x_factor).astype(int)
-                height = (h * y_factor).astype(int)
-                
-                boxes = np.stack((left, top, width, height), axis=1).tolist()
-                confidences = final_scores.tolist()
-                class_ids = class_ids_arr.tolist()
-
-        # Apply NMS
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, CONF_THRESHOLD, NMS_THRESHOLD)
+        # Extract detections (pandas not needed, we use tensor)
+        # xyxy[0] is the tensor of detections for the first image
+        detections = results.xyxy[0].cpu().numpy() 
+        # Format: [x1, y1, x2, y2, confidence, class_id]
 
         # --- Visualization ---
         status_text = "Status: Safe"
         color_status = (0, 255, 0)
         alert_triggered = False
 
-        if len(indices) > 0:
-            for i in indices.flatten():
-                box = boxes[i]
-                cls_id = class_ids[i]
-                score = confidences[i]
-                
-                x, y, w, h = box
-                
+        for det in detections:
+            x1, y1, x2, y2, conf, cls_id = det
+            
+            if conf > CONF_THRESHOLD:
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                cls_id = int(cls_id)
+                label_name = model.names[cls_id]
+
                 # Alert Logic
                 if cls_id in ALERT_CLASSES:
                     alert_triggered = True
                     color_status = (0, 0, 255)
-                    status_text = f"WARNING: {CLASS_NAMES[cls_id].upper()}"
+                    status_text = f"WARNING: {label_name.upper()}"
                     box_color = (0, 0, 255)
                 else:
                     box_color = (0, 255, 0)
 
-                cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
-                label = f"{CLASS_NAMES[cls_id]}: {score:.2f}"
-                cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+                label = f"{label_name}: {conf:.2f}"
+                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
 
         # --- Alarm Trigger ---
         if alert_triggered:
