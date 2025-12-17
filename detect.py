@@ -311,7 +311,7 @@ def run(weights=ROOT / 'weights/yolov5n.pt',  # model.pt path(s)
 
                             elif names[c] == 'Yawn':
                                 yawning_arr.append([names[c]])
-                                s_img = cv2.imread("icons/coffe2.jpg")
+                                s_img = cv2.imread("icons/coffee.jpg")
                                 s_img = cv2.resize(s_img, (72, 60), cv2.INTER_LINEAR)
                                 im0[33:33 + s_img.shape[0], 10:10 + s_img.shape[1]] = s_img
 
