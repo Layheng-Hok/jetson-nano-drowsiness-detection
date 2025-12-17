@@ -260,9 +260,9 @@ def run(weights=ROOT / 'weights/yolov5n.pt',  # model.pt path(s)
                         if names[c] == 'Alert':
                             color = (255, 200, 90)
                         elif names[c] == 'MicroSleep':
-                            color = (0, 165, 255)
+                            color = (0, 0, 255)
                         elif names[c] == 'Yawn':
-                            color = (51, 255, 255)
+                            color = (0, 255, 255)
 
                         c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))
                         cv2.rectangle(im0, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
