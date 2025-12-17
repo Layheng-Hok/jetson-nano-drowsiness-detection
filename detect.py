@@ -269,7 +269,7 @@ def run(weights=ROOT / 'weights/yolov5n.pt',  # model.pt path(s)
                         if names[c]:
                             if names[c] == 'Alert':
                                 normal_arr.append([names[c]])
-                                drowsy_text = 'Alert '
+                                drowsy_text = 'NORMAL '
                                 label_size, base_line = cv2.getTextSize(drowsy_text, cv2.FONT_HERSHEY_SIMPLEX,
                                                                         font_scale,
                                                                         thickness)
