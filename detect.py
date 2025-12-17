@@ -1,4 +1,4 @@
-# YOLOv5 Ã°Å¸Å¡â‚¬ by Ultralytics, GPL-3.0 license
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Run inference on images, videos, directories, streams, etc.
 
@@ -24,6 +24,11 @@ ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+# --- FIX START: Patch for Attribute Error ---
+import models.yolo
+models.yolo.DetectionModel = models.yolo.Model
+# --- FIX END ---
 
 from models.experimental import attempt_load
 from utils.datasets import LoadImages, LoadStreams
@@ -428,3 +433,4 @@ def main(opt):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+    
