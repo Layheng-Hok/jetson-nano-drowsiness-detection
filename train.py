@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def train_and_export():
-    # --- Configuration ---
+    # configuration
     os.environ['WANDB_MODE'] = 'disabled'
     os.environ['WANDB_SILENT'] = 'true'
     if 'WANDB_API_KEY' in os.environ:
@@ -24,7 +24,7 @@ def train_and_export():
     train_script = os.path.join(yolo_dir, "train.py")
     export_script = os.path.join(yolo_dir, "export.py")
 
-    # --- Sanity Checks ---
+    # sanity checks
     if not os.path.exists(yolo_dir):
         print(f"ERROR: '{yolo_dir}' not found.")
         return
@@ -32,7 +32,7 @@ def train_and_export():
         print(f"ERROR: Dataset config not found at {data_yaml}")
         return
 
-    # --- Training ---
+    # training
     print(f"Starting OFF-LINE training for {project_name}...")
     
     train_cmd = [
@@ -53,7 +53,7 @@ def train_and_export():
         print("Training failed.")
         return
 
-    # --- Export for Jetson Nano ---
+    # export
     best_weights = os.path.join(yolo_dir, "runs", "train", project_name, "weights", "best.pt")
     
     if os.path.exists(best_weights):
