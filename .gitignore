@@ -9,4 +9,6 @@ dataset
 .DS_Store
 *.sh
 *.whl
+*.mp4
+__pycache__/
 
