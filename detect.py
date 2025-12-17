@@ -8,29 +8,32 @@ import os
 import pathlib
 
 # --- CONFIGURATION ---
-# Path to your custom model
+# Path to your .pt file (Update this to your actual path)
 MODEL_PATH = './yolov5/runs/train/drowsiness_yolov5/weights/best.pt' 
-SOURCE = 0
+
+# Path to the cloned YOLOv5 folder (must be in the same directory as this script)
+YOLO_DIR = './yolov5'
+
+SOURCE = 0              # 0 for USB webcam, or string for video file
 ALARM_FILE = "alarm.wav" 
 CONF_THRESHOLD = 0.50
-NMS_THRESHOLD = 0.45 # IOU Threshold
+NMS_THRESHOLD = 0.45
 
-# Class Definitions
-# Ensure these match the classes your model was trained on
+# Class Names (Must match training)
 CLASS_NAMES = ['Alert', 'MicroSleep', 'Yawn']
-ALERT_CLASSES = [1, 2] # IDs of classes that trigger the alarm
+ALERT_CLASSES = [1, 2]  # Class IDs that trigger the alarm
 
 last_alert_time = 0
 alert_cooldown = 3.0
 
-# --- FIX FOR JETSON/PYTHON 3.6 PATHLIB ISSUE ---
-# Older pathlib on Py3.6 can cause issues with YOLOv5 loader
-temp = pathlib.PosixPath
-pathlib.PosixPath = pathlib.WindowsPath
+# --- PYTHON 3.6 / JETSON COMPATIBILITY PATCHES ---
+# Fixes "NotImplementedError" if model was trained on Windows
+pathlib.WindowsPath = pathlib.PosixPath
 
 def play_alarm_sound():
     if os.path.exists(ALARM_FILE):
         try:
+            # 'aplay' is the standard command line player for ALSA on Linux
             os.system(f"aplay -q {ALARM_FILE}")
         except Exception as e:
             print(f"Audio Error: {e}")
@@ -38,36 +41,38 @@ def play_alarm_sound():
 def main():
     global last_alert_time
 
-    # 1. Load Model via Torch Hub
-    # We use the 'ultralytics/yolov5' repo to load the custom weights.
-    # This automatically handles the model architecture.
-    print(f"Loading {MODEL_PATH} on PyTorch...")
-    
-    try:
-        # 'custom' lets us load our own weights. 
-        # 'source="github"' fetches the code structure from the internet.
-        model = torch.hub.load('ultralytics/yolov5', 'custom', path=MODEL_PATH, force_reload=False)
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        print("Ensure you have internet connection to fetch the YOLOv5 repo structure first.")
+    # 1. Check for YOLOv5 folder
+    if not os.path.exists(YOLO_DIR):
+        print(f"ERROR: '{YOLO_DIR}' folder not found.")
+        print("Please run: git clone https://github.com/ultralytics/yolov5")
         sys.exit(1)
 
-    # 2. Configure Model Settings
-    model.conf = CONF_THRESHOLD  # Confidence threshold
-    model.iou = NMS_THRESHOLD    # NMS IoU threshold
+    # 2. Load Model using Local Source
+    print(f"Loading {MODEL_PATH}...")
+    try:
+        # source='local' uses the folder on your disk, avoiding the python 3.8 dependency issue
+        model = torch.hub.load(YOLO_DIR, 'custom', path=MODEL_PATH, source='local')
+    except Exception as e:
+        print(f"\nCRITICAL ERROR LOADING MODEL: {e}")
+        print("Tip: If you get a 'requirements' error, try installing pandas/requests manually.")
+        sys.exit(1)
+
+    # 3. Configure Model Settings
+    model.conf = CONF_THRESHOLD
+    model.iou = NMS_THRESHOLD
     
-    # 3. Setup Device (CUDA is critical for Jetson)
+    # 4. Setup Device (Force CUDA for Jetson)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
     if device.type == 'cuda':
-        print(f">> CUDA Backend ENABLED. Model is on GPU.")
-        # Half precision (fp16) runs much faster on Jetson Nano GPUs
+        print(f">> CUDA Backend ENABLED. Model running on GPU.")
+        # FP16 is essential for Jetson Nano performance
         model.half() 
     else:
-        print(">> WARNING: CUDA not found. Running on CPU (Very Slow).")
+        print(">> WARNING: CUDA not found. Running on CPU (Will be slow).")
 
-    # 4. Start Camera
+    # 5. Initialize Camera
     cap = cv2.VideoCapture(SOURCE)
     if not cap.isOpened():
         print(f"Error: Camera {SOURCE} not found.")
@@ -79,57 +84,65 @@ def main():
         ret, frame = cap.read()
         if not ret: break
 
-        # Inference
+        # Start timer for FPS
         start_time = time.time()
         
-        # PyTorch YOLOv5 expects RGB images (OpenCV is BGR)
+        # YOLOv5 expects RGB, OpenCV gives BGR
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Pass the image to the model
-        # The model handles resizing and normalizing internally
+        # Inference
         results = model(img_rgb)
         
-        # Parse Results
-        # .xyxy[0] returns a tensor of shape (N, 6): [x1, y1, x2, y2, confidence, class]
+        # Process Detections
+        # .xyxy[0] is a tensor: [x1, y1, x2, y2, confidence, class]
         detections = results.xyxy[0]
 
         alert_triggered = False
 
-        # Loop through detections
         for *xyxy, conf, cls in detections:
-            # Move data to CPU and convert to integer/float
+            # Move to CPU and convert to correct types
             x1, y1, x2, y2 = map(int, xyxy)
             conf = float(conf)
             cls_id = int(cls)
 
-            label = f"{CLASS_NAMES[cls_id] if cls_id < len(CLASS_NAMES) else cls_id} {conf:.2f}"
+            # Get Label Name
+            if cls_id < len(CLASS_NAMES):
+                label_name = CLASS_NAMES[cls_id]
+            else:
+                label_name = str(cls_id)
+
+            label = f"{label_name} {conf:.2f}"
             
-            # Logic for Alarm/Color
+            # Determine Color and Alert Status
             if cls_id in ALERT_CLASSES:
                 color = (0, 0, 255) # Red for Alert
                 alert_triggered = True
             else:
                 color = (0, 255, 0) # Green for Safe
 
-            # Draw Box & Label
+            # Draw Bounding Box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            # Draw Label Background
+            (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(frame, (x1, y1 - 20), (x1 + w, y1), color, -1)
+            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        # Alarm Trigger Logic
+        # Alarm Logic
         if alert_triggered:
             cv2.putText(frame, "WARNING!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
             current_time = time.time()
             if current_time - last_alert_time > alert_cooldown:
+                # Run sound in separate thread to prevent freezing video
                 threading.Thread(target=play_alarm_sound, daemon=True).start()
                 last_alert_time = current_time
 
-        # FPS calculation
-        end_time = time.time()
-        fps = 1 / (end_time - start_time)
-        
+        # Calculate and Display FPS
+        fps = 1.0 / (time.time() - start_time)
         cv2.putText(frame, f"FPS: {fps:.1f}", (frame.shape[1] - 120, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-        cv2.imshow("Jetson PyTorch Detection", frame)
+        # Show Output
+        cv2.imshow("Jetson Drowsiness Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
@@ -138,3 +151,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
