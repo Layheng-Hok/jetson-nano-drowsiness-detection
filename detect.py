@@ -17,10 +17,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-# --- FIX START: Patch for Attribute Error ---
 import models.yolo
 models.yolo.DetectionModel = models.yolo.Model
-# --- FIX END ---
 
 from models.experimental import attempt_load
 from utils.datasets import LoadImages, LoadStreams
