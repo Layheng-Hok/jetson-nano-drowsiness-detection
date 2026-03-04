@@ -36,7 +36,7 @@ This project implements a real-time behavioral monitoring system designed to det
 └── README.md
 ```
 
-## 🧠 Methodology
+## 🔬 Methodology
 
 ### 1. Model Selection
 We utilized **YOLOv5n (Nano)**, the most lightweight variant of the YOLOv5 family. It features ~1.9 million parameters, making it ideal for the limited RAM and computational power of the NVIDIA Jetson Nano.
