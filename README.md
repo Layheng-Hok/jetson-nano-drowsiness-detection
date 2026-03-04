@@ -2,7 +2,7 @@
 
 [![YOLOv5](https://img.shields.io/badge/Model-YOLOv5n-orange)](https://github.com/ultralytics/yolov5)
 [![Hardware](https://img.shields.io/badge/Hardware-Jetson%20Nano-green)](https://developer.nvidia.com/embedded/learn/get-started-jetson-nano-devkit)
-[![Accuracy](https://img.shields.io/badge/mAP@0.5-98.5%25-blue)](#)
+[![Accuracy](https://img.shields.io/badge/mAP@0.5-98.5%25-blue)](runs/train/drowsiness_yolov5/results.png)
 
 This project implements a real-time behavioral monitoring system designed to detect driver fatigue. By leveraging the **YOLOv5n** architecture and optimizing it for edge deployment, the system classifies driver states into three categories: **Alert**, **Yawn**, and **MicroSleep**, triggering visual and auditory alerts when danger is detected.
 
