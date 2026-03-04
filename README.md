@@ -139,12 +139,6 @@ During detection, the system provides real-time feedback:
 - **Drowsy (Red Box + Warning Icon):** Displayed during MicroSleep. 
 - **Sound:** The `playsound` library is used to trigger an audible alarm during MicroSleep events.
 
-## 🛠 Optimization for Edge
-To achieve the **15-20 FPS** observed on Jetson Nano:
-1. **ONNX Export:** The `train.py` script exports the model to ONNX format, which allows for faster execution than raw PyTorch.
-2. **Half-Precision:** Use the `--half` flag in `detect.py` if your Jetson supports FP16 for a significant speed boost.
-3. **Resolution:** Inference is performed at `640x640` to maintain balance between accuracy and latency.
-
 ## 👥 Contributors
 - **Southern University of Science and Technology (SUSTech)**
 - **Team:**
