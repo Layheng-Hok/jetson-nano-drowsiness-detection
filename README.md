@@ -32,9 +32,8 @@ This project implements a real-time behavioral monitoring system designed to det
 ├── yolov5/                    # YOLOv5 Submodule
 ├── detect.py                  # Inference script with Alert Logic
 ├── train.py                   # Training & ONNX Export script
-├── run.sh                     # Shell script for quick execution
 ├── requirements.txt           # Python dependencies
-└── yolov5n.pt                 # Pre-trained base weights
+└── README.md
 ```
 
 ## 🧠 Methodology
