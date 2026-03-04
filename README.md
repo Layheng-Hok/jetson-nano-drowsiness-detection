@@ -147,7 +147,12 @@ To achieve the **15-20 FPS** observed on Jetson Nano:
 
 ## 👥 Contributors
 - **Southern University of Science and Technology (SUSTech)**
-- Team: Jaouhara Zerhouni Khal, Saruulbuyan Munkhtur, Wai Yan Kyaw, Tan Hao Yang, Hok Lay Heng.
+- **Team:**
+  - [Jaouhara Zerhouni Khal](https://github.com/Jouwy)
+  - [Saruulbuyan Munkhtur](https://github.com/Saruulbuyan-Munkhtur)
+  - [Wai Yan Kyaw](https://github.com/waiyankyaw-dev)
+  - [Tan Hao Yang](https://github.com/haoyanghy)
+  - [Hok Lay Heng](https://github.com/Layheng-Hok)
 
 *Developed as part of CS324's final project: Demo AI on Chips.*
 
